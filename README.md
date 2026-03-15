@@ -24,4 +24,5 @@ Profile also saves
   - Jewelry recommendations
 
 Being able to scroll through clothing/jewelry recommendations
+
 Computer Vision to get color values from the face/determine shape of the face
