@@ -1,5 +1,8 @@
 "use client";
 
+import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import type { ChangeEvent, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -46,6 +49,10 @@ export default function Home() {
     "For you",
   );
 
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const router = useRouter();
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -73,6 +80,24 @@ export default function Home() {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/login");
+      } else {
+        setUser(user);
+      }
+
+      setAuthLoading(false);
+      };
+
+    checkUser();
   }, []);
 
   async function startCamera() {
@@ -199,6 +224,19 @@ export default function Home() {
         6,
       ),
     );
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      await supabase.from("analyses").insert([
+        {
+          user_id: user.id,
+          result: nextResult,
+        },
+      ]);
+    }
     setActiveTab("home");
   }
 
@@ -217,6 +255,10 @@ export default function Home() {
           ...recommendationGroups.colors,
         ]
       : [];
+
+  if (authLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--app-canvas)] text-[var(--ink)]">
@@ -265,6 +307,7 @@ export default function Home() {
 
           {activeTab === "profile" && (
             <ProfileScreen
+              user={user}
               result={result}
               history={history}
               hairDyed={hairDyed}
@@ -713,12 +756,14 @@ function RecommendationsScreen({
 }
 
 function ProfileScreen({
+  user,
   result,
   history,
   hairDyed,
   wearingMakeup,
   onRetake,
 }: {
+  user: User | null;
   result: AnalysisResult | null;
   history: AnalysisResult[];
   hairDyed: boolean;
@@ -757,7 +802,7 @@ function ProfileScreen({
       </div>
 
       <div className="space-y-3 rounded-[28px] bg-[var(--soft)] p-5">
-        <ProfileLine label="Email" value="abc@gmail.com" />
+        <ProfileLine label="Email" value={user?.email ?? "Unknown"} />
         <ProfileLine label="Privacy" value="Ephemeral source photo" />
         <ProfileLine label="Hair dyed" value={hairDyed ? "Yes" : "No"} />
         <ProfileLine
@@ -765,6 +810,16 @@ function ProfileScreen({
           value={wearingMakeup ? "Yes" : "No"}
         />
       </div>
+
+      <button
+          onClick={async () => {
+            await supabase.auth.signOut();
+            window.location.href = "/login";
+          }}
+          className="mt-4 rounded-full bg-red-500 px-4 py-3 text-white"
+        >
+          Logout
+        </button>
 
       <div className="rounded-[28px] border border-black/5 bg-white p-5 shadow-[0_12px_28px_rgba(18,18,18,0.05)]">
         <div className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
