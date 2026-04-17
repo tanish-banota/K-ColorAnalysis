@@ -50,6 +50,12 @@ export default function Home() {
   );
 
   const [user, setUser] = useState<any>(null);
+  type Profile = {
+    first_name: string;
+    last_name: string;
+  };
+  
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const router = useRouter();
 
@@ -87,16 +93,49 @@ export default function Home() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
+  
       if (!user) {
         router.push("/login");
-      } else {
-        setUser(user);
+        setAuthLoading(false);
+        return;
       }
+  
+      setUser(user);
+  
+      const { data: existingProfile, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+  
+      if (error || !existingProfile) {
 
+        const fullName = user.user_metadata?.full_name || "";
+        const nameParts = fullName.split(" ");
+  
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+  
+        const { data: newProfile } = await supabase
+          .from("profiles")
+          .insert([
+            {
+              id: user.id,
+              first_name: firstName,
+              last_name: lastName,
+            },
+          ])
+          .select()
+          .single();
+  
+        setProfile(newProfile);
+      } else {
+        setProfile(existingProfile);
+      }
+  
       setAuthLoading(false);
-      };
-
+    };
+  
     checkUser();
   }, []);
 
@@ -308,6 +347,7 @@ export default function Home() {
           {activeTab === "profile" && (
             <ProfileScreen
               user={user}
+              profile={profile}
               result={result}
               history={history}
               hairDyed={hairDyed}
@@ -757,6 +797,7 @@ function RecommendationsScreen({
 
 function ProfileScreen({
   user,
+  profile,
   result,
   history,
   hairDyed,
@@ -764,6 +805,10 @@ function ProfileScreen({
   onRetake,
 }: {
   user: User | null;
+  profile: {
+    first_name: string;
+    last_name: string;
+  } | null;
   result: AnalysisResult | null;
   history: AnalysisResult[];
   hairDyed: boolean;
@@ -790,11 +835,11 @@ function ProfileScreen({
           />
         </div>
         <div>
-          <div className="text-4xl font-semibold tracking-[-0.04em]">
-            First Name
-            <br />
-            Last Name
-          </div>
+        <div className="text-4xl font-semibold tracking-[-0.04em]">
+          {profile
+            ? `${profile.first_name} ${profile.last_name || ""}`.trim()
+            : "Your Name"}
+        </div>
           <div className="mt-3 text-base text-[var(--muted)]">
             {result.primarySeason} primary
           </div>
@@ -803,6 +848,15 @@ function ProfileScreen({
 
       <div className="space-y-3 rounded-[28px] bg-[var(--soft)] p-5">
         <ProfileLine label="Email" value={user?.email ?? "Unknown"} />
+        <ProfileLine
+          label="Name"
+          value={
+            profile && (profile.first_name || profile.last_name)
+              ? `${profile.first_name} ${profile.last_name || ""}`.trim()
+              : user?.email ?? "Unknown"
+          }
+/>
+      
         <ProfileLine label="Privacy" value="Ephemeral source photo" />
         <ProfileLine label="Hair dyed" value={hairDyed ? "Yes" : "No"} />
         <ProfileLine

@@ -110,7 +110,7 @@ export default function LoginPage() {
 
         {/* Signup */}
         <button
-          onClick={handleSignup}
+          onClick={() => router.push("/signup")}
           className="mt-3 w-full rounded-full bg-[var(--soft)] py-3 text-sm font-medium"
         >
           Create account
