@@ -15,6 +15,8 @@ import {
   type RecommendationItem,
   type ScreenTab,
 } from "@/lib/k-color-analysis";
+import { useProductImage } from "@/lib/useProductImage";
+
 
 type SavedState = {
   result: AnalysisResult | null;
@@ -338,7 +340,6 @@ export default function Home() {
               result={result}
               selectedFeed={selectedFeed}
               onFeedChange={setSelectedFeed}
-              items={recommendationFeed}
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
             />
@@ -463,20 +464,28 @@ function HomeScreen({
           </section>
 
           <section className="space-y-3">
-            <SectionHeader title="Your Recommendations" actionLabel="View all" />
+            <SectionHeader
+              title="Your Recommendations"
+              actionLabel="View all"
+              onAction={onOpenRecommendations}
+            />
             <div className="grid grid-cols-3 gap-3">
-              <RecommendationOrb
+              <ProductOrb
                 label="Jewelry"
-                subtitle={result.jewelryRecommendations[0]?.metal ?? "Silver"}
+                item={groups?.jewelry[0]}
+                category="jewelry"
               />
-              <RecommendationOrb
+              <ProductOrb
                 label="Clothing"
-                subtitle={groups?.clothing[0]?.title ?? "Soft tops"}
+                item={groups?.clothing[0]}
+                category="clothing"
               />
               <RecommendationOrb
                 label="Colors"
                 subtitle={result.bestColors[0]?.name ?? "Palette"}
+                swatchHex={result.bestColors[0]?.hex}
               />
+
             </div>
           </section>
 
@@ -700,14 +709,12 @@ function RecommendationsScreen({
   result,
   selectedFeed,
   onFeedChange,
-  items,
   favorites,
   onToggleFavorite,
 }: {
   result: AnalysisResult | null;
   selectedFeed: "For you" | "Favorites";
   onFeedChange: (value: "For you" | "Favorites") => void;
-  items: RecommendationItem[];
   favorites: string[];
   onToggleFavorite: (value: string) => void;
 }) {
@@ -720,8 +727,35 @@ function RecommendationsScreen({
     );
   }
 
+  const clothingItems = result.clothingRecommendations.filter(
+    (item) => item.category === "Clothing",
+  );
+  const jewelryItems = result.clothingRecommendations.filter(
+    (item) => item.category === "Jewelry",
+  );
+
+  const filterSaved = <T extends { id: string }>(list: T[]) =>
+    selectedFeed === "Favorites"
+      ? list.filter((item) => favorites.includes(item.id))
+      : list;
+
+  const primaryColors = filterSaved(
+    result.bestColors.map((swatch) => ({ ...swatch, id: `color:${swatch.hex}` })),
+  );
+  const secondaryColors = filterSaved(
+    result.secondaryBestColors.map((swatch) => ({
+      ...swatch,
+      id: `color:${swatch.hex}`,
+    })),
+  );
+  const clothing = filterSaved(clothingItems);
+  const jewelry = filterSaved(jewelryItems);
+
+  const hasAny =
+    primaryColors.length || secondaryColors.length || clothing.length || jewelry.length;
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="text-center">
         <div className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
           Recommendations
@@ -748,52 +782,193 @@ function RecommendationsScreen({
         ))}
       </div>
 
-      <div className="space-y-5">
-        {items.length ? (
-          items.map((item) => (
-            <div
+      {!hasAny && (
+        <EmptyState
+          title={selectedFeed === "Favorites" ? "No favorites yet" : "Nothing to show"}
+          body="Save pieces from your feed and they will appear here."
+        />
+      )}
+
+      {primaryColors.length > 0 && (
+        <RecommendationRow
+          title={`${result.primarySeason} palette`}
+          subtitle={`Your primary ${result.toneSubtype} colors`}
+        >
+          {primaryColors.map((swatch) => (
+            <ColorSwatchCard
+              key={swatch.id}
+              swatch={swatch}
+              saved={favorites.includes(swatch.id)}
+              onToggle={() => onToggleFavorite(swatch.id)}
+            />
+          ))}
+        </RecommendationRow>
+      )}
+
+      {secondaryColors.length > 0 && (
+        <RecommendationRow
+          title={`${result.secondarySeason} palette`}
+          subtitle="Your secondary season colors"
+        >
+          {secondaryColors.map((swatch) => (
+            <ColorSwatchCard
+              key={swatch.id}
+              swatch={swatch}
+              saved={favorites.includes(swatch.id)}
+              onToggle={() => onToggleFavorite(swatch.id)}
+            />
+          ))}
+        </RecommendationRow>
+      )}
+
+      {clothing.length > 0 && (
+        <RecommendationRow title="Clothing" subtitle="Pieces that flatter your palette">
+          {clothing.map((item) => (
+            <ProductCard
               key={item.id}
-              className="rounded-[28px] border border-black/5 bg-white p-4 shadow-[0_12px_28px_rgba(18,18,18,0.05)]"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-                    {item.category}
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold">{item.title}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onToggleFavorite(item.id)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    favorites.includes(item.id)
-                      ? "bg-black text-white"
-                      : "bg-[var(--soft)] text-[var(--muted)]"
-                  }`}
-                >
-                  {favorites.includes(item.id) ? "Saved" : "Save"}
-                </button>
-              </div>
+              item={item}
+              category="clothing"
+              saved={favorites.includes(item.id)}
+              onToggle={() => onToggleFavorite(item.id)}
+            />
+          ))}
+        </RecommendationRow>
+      )}
 
-              <div className="mt-4 h-72 rounded-[26px] bg-[var(--soft)] p-3">
-                <LookCard item={item} />
-              </div>
+      {jewelry.length > 0 && (
+        <RecommendationRow title="Jewelry" subtitle="Metals and finishes that suit you">
+          {jewelry.map((item) => (
+            <ProductCard
+              key={item.id}
+              item={item}
+              category="jewelry"
+              saved={favorites.includes(item.id)}
+              onToggle={() => onToggleFavorite(item.id)}
+            />
+          ))}
+        </RecommendationRow>
+      )}
+    </div>
+  );
+}
 
-              <div className="mt-4 text-sm leading-6 text-[var(--muted)]">
-                {item.reason}
-              </div>
-            </div>
-          ))
-        ) : (
-          <EmptyState
-            title="No favorites yet"
-            body="Save pieces from your feed and they will show up here."
+function RecommendationRow({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <div className="text-xl font-semibold">{title}</div>
+        <div className="text-sm text-[var(--muted)]">{subtitle}</div>
+      </div>
+      <div className="-mx-5 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-3 px-5 pb-2">{children}</div>
+      </div>
+    </section>
+  );
+}
+
+function ColorSwatchCard({
+  swatch,
+  saved,
+  onToggle,
+}: {
+  swatch: ColorSwatch & { id: string };
+  saved: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="relative flex w-36 shrink-0 flex-col overflow-hidden rounded-[22px] border border-black/5 bg-white shadow-[0_8px_24px_rgba(18,18,18,0.06)]"
+    >
+      <div
+        className="h-36 w-full"
+        style={{ backgroundColor: swatch.hex }}
+      />
+      <div className="flex items-center justify-between gap-2 px-3 py-3 text-left">
+        <div>
+          <div className="text-sm font-semibold">{swatch.name}</div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+            {swatch.hex}
+          </div>
+        </div>
+        <span
+          className={`h-5 w-5 shrink-0 rounded-full border ${
+            saved ? "border-black bg-black" : "border-black/20 bg-white"
+          }`}
+        />
+      </div>
+    </button>
+  );
+}
+
+function ProductCard({
+  item,
+  category,
+  saved,
+  onToggle,
+}: {
+  item: RecommendationItem;
+  category: "clothing" | "jewelry";
+  saved: boolean;
+  onToggle: () => void;
+}) {
+  const productImage = useProductImage(item.image, category);
+
+  return (
+    <div className="relative flex w-60 shrink-0 flex-col overflow-hidden rounded-[22px] border border-black/5 bg-white shadow-[0_8px_24px_rgba(18,18,18,0.06)]">
+      <div className="relative h-60 w-full bg-[var(--soft)]">
+        {productImage?.url ? (
+          <img
+            src={productImage.url}
+            alt={item.title}
+            className="h-full w-full object-cover"
           />
+        ) : (
+          <div className="flex h-full items-center justify-center text-xs text-[var(--muted)]">
+            {productImage === null ? "Loading..." : "No image yet"}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-medium ${
+            saved ? "bg-black text-white" : "bg-white/90 text-black"
+          }`}
+        >
+          {saved ? "Saved" : "Save"}
+        </button>
+      </div>
+      <div className="space-y-1 px-4 py-3">
+        <div className="text-sm font-semibold">{item.title}</div>
+        <div className="text-xs leading-5 text-[var(--muted)]">{item.reason}</div>
+        {productImage?.attribution && (
+          <div className="pt-1 text-[9px] uppercase tracking-[0.18em] text-[var(--muted)]">
+            Photo by{" "}
+            <a
+              href={`${productImage.attribution.photographerUrl}?utm_source=k-color-analysis&utm_medium=referral`}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              {productImage.attribution.photographer}
+            </a>{" "}
+            / Unsplash
+          </div>
         )}
       </div>
     </div>
   );
 }
+
 
 function ProfileScreen({
   user,
@@ -1007,27 +1182,79 @@ function AvatarCard({ result }: { result: AnalysisResult }) {
   );
 }
 
+function ProductOrb({
+  label,
+  item,
+  category,
+}: {
+  label: string;
+  item: RecommendationItem | undefined;
+  category: "clothing" | "jewelry";
+}) {
+  const productImage = useProductImage(item?.image, category);
+  return (
+    <RecommendationOrb
+      label={label}
+      subtitle={item?.title ?? "—"}
+      imageUrl={productImage?.url}
+    />
+  );
+}
+
 function RecommendationOrb({
   label,
   subtitle,
+  imageUrl,
+  swatchHex,
 }: {
   label: string;
   subtitle: string;
+  imageUrl?: string | null;
+  swatchHex?: string;
 }) {
   return (
     <div className="rounded-[24px] bg-[var(--soft)] p-3 text-center">
-      <div className="mx-auto h-16 w-16 rounded-full bg-white shadow-[0_8px_20px_rgba(18,18,18,0.06)]" />
+      <div className="mx-auto h-16 w-16 overflow-hidden rounded-full bg-white shadow-[0_8px_20px_rgba(18,18,18,0.06)]">
+        {swatchHex ? (
+          <div className="h-full w-full" style={{ backgroundColor: swatchHex }} />
+        ) : imageUrl ? (
+          <img
+            src={imageUrl}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : null}
+      </div>
       <div className="mt-3 text-sm font-semibold">{label}</div>
       <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{subtitle}</div>
     </div>
   );
 }
 
+
 function EditorialCard({ item }: { item: RecommendationItem }) {
+  const category =
+    item.category === "Clothing"
+      ? "clothing"
+      : item.category === "Jewelry"
+        ? "jewelry"
+        : undefined;
+  const productImage = useProductImage(item.image, category);
+
   return (
     <div className="overflow-hidden rounded-[26px] bg-[var(--soft)]">
-      <div className="flex h-36 items-center justify-center bg-white">
-        <LookCard item={item} compact />
+      <div className="h-36 w-full overflow-hidden bg-white">
+        {productImage?.url ? (
+          <img
+            src={productImage.url}
+            alt={item.title}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-xs text-[var(--muted)]">
+            {productImage === null ? "Loading..." : "No image"}
+          </div>
+        )}
       </div>
       <div className="p-4">
         <div className="text-sm font-semibold">{item.title}</div>
@@ -1038,6 +1265,7 @@ function EditorialCard({ item }: { item: RecommendationItem }) {
     </div>
   );
 }
+
 
 function LookCard({
   item,
@@ -1159,14 +1387,26 @@ function GuideCorners() {
 function SectionHeader({
   title,
   actionLabel,
+  onAction,
 }: {
   title: string;
   actionLabel: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="flex items-center justify-between">
       <div className="text-xl font-semibold">{title}</div>
-      <div className="text-sm text-[var(--muted)]">{actionLabel}</div>
+      {onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="text-sm text-[var(--muted)] underline-offset-2 hover:underline"
+        >
+          {actionLabel}
+        </button>
+      ) : (
+        <div className="text-sm text-[var(--muted)]">{actionLabel}</div>
+      )}
     </div>
   );
 }

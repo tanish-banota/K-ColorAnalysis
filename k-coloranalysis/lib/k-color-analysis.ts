@@ -64,6 +64,7 @@ export type AnalysisResult = {
   eyes: RegionColor;
   hair: RegionColor;
   bestColors: ColorSwatch[];
+  secondaryBestColors: ColorSwatch[];
   neutralColors: ColorSwatch[];
   accentColors: ColorSwatch[];
   avoidColors: ColorSwatch[];
@@ -98,6 +99,14 @@ const SUBTYPE_TO_SECONDARY: Record<string, AnalysisResult["secondarySeason"]> = 
   "True Winter": "Summer",
   "Deep Winter": "Autumn",
 };
+
+const SEASON_DEFAULT_SUBTYPE: Record<AnalysisResult["secondarySeason"], string> = {
+  Spring: "True Spring",
+  Summer: "True Summer",
+  Autumn: "True Autumn",
+  Winter: "True Winter",
+};
+
 
 const PALETTES: Record<
   string,
@@ -139,7 +148,7 @@ const PALETTES: Record<
         description: "A creamy collared knit keeps the focus on your face.",
         category: "Clothing",
         paletteTags: ["Spring", "Light Spring"],
-        image: "Soft knit polo",
+        image: "cream knit polo shirt",
         reason: "Warm light neutrals echo your brightness without draining you.",
       },
       {
@@ -148,7 +157,7 @@ const PALETTES: Record<
         description: "An easy topper for light warm palettes.",
         category: "Clothing",
         paletteTags: ["Spring", "Light Spring"],
-        image: "Apricot cardigan",
+        image: "Apricot cardigan sweater",
         reason: "Low contrast shapes suit lighter value ranges.",
       },
       {
@@ -194,20 +203,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "true-spring-polo",
-        title: "Fresh warm polo",
+        title: "Warm coral polo shirt",
         description: "A structured collar gives brightness without heaviness.",
         category: "Clothing",
         paletteTags: ["Spring", "True Spring"],
-        image: "Warm coral polo",
+        image: "Warm coral polo shirt",
         reason: "Clear warm shades keep your complexion lively.",
       },
       {
         id: "true-spring-earrings",
-        title: "Bright gold hoops",
+        title: "Gold hoop earrings",
         description: "Simple warm-metal jewelry with polished surfaces.",
         category: "Jewelry",
         paletteTags: ["Spring", "True Spring"],
-        image: "Gold hoops",
+        image: "Gold hoop earrings",
         reason: "High clarity works better than antique finishes here.",
       },
       {
@@ -253,20 +262,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "bright-spring-knit",
-        title: "Clean contrast knit",
+        title: "Bright knit sweater with contrasting colors",
         description: "Cream base with a bright warm accent near the face.",
         category: "Clothing",
         paletteTags: ["Spring", "Bright Spring"],
-        image: "Contrast knit",
+        image: "bright knit sweater with contrasting colors",
         reason: "You hold color best when it is bright and clean.",
       },
       {
         id: "bright-spring-chain",
-        title: "Glossy warm chain",
+        title: "Shiny necklace",
         description: "Simple hardware with a little shine.",
         category: "Jewelry",
         paletteTags: ["Spring", "Bright Spring"],
-        image: "Glossy chain",
+        image: "shiny necklace",
         reason: "Reflective finishes match your brighter contrast level.",
       },
       {
@@ -312,20 +321,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "light-summer-blouse",
-        title: "Powder knit top",
+        title: "Light colored knit sweater",
         description: "Soft drape and cool light color near the face.",
         category: "Clothing",
         paletteTags: ["Summer", "Light Summer"],
-        image: "Powder knit",
+        image: "light colored knit sweater",
         reason: "Your palette looks best in cool colors with gentle value.",
       },
       {
         id: "light-summer-earrings",
-        title: "Pearl studs",
+        title: "Pearl earrings",
         description: "A soft luminous finish instead of high-shine metal.",
         category: "Jewelry",
         paletteTags: ["Summer", "Light Summer"],
-        image: "Pearl studs",
+        image: "Pearl earrings",
         reason: "Low-contrast refinement flatters light summer coloring.",
       },
       {
@@ -371,20 +380,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "true-summer-crew",
-        title: "Soft cool crewneck",
+        title: "Cool crewneck shirt",
         description: "A dusty mauve knit for balanced cool coloring.",
         category: "Clothing",
         paletteTags: ["Summer", "True Summer"],
-        image: "Dusty crewneck",
+        image: "Cool crewneck shirt",
         reason: "Cool muted shades feel polished, not loud, on you.",
       },
       {
         id: "true-summer-jewelry",
-        title: "Brushed silver pendant",
+        title: "Silver pendant necklace",
         description: "Low-gloss silver with clean shapes.",
         category: "Jewelry",
         paletteTags: ["Summer", "True Summer"],
-        image: "Silver pendant",
+        image: "Silver pendant necklace",
         reason: "Brushed finishes align with a muted cool palette.",
       },
       {
@@ -430,20 +439,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "soft-summer-top",
-        title: "Muted halter knit",
+        title: "Dull halter knit shirt",
         description: "A dusty rose halter for low-contrast cool coloring.",
         category: "Clothing",
         paletteTags: ["Summer", "Soft Summer"],
-        image: "Muted halter knit",
+        image: "Dull halter knit shirt",
         reason: "Your features look polished in softened cool colors.",
       },
       {
         id: "soft-summer-necklace",
-        title: "Matte silver chain",
+        title: "Matte silver necklace",
         description: "Slim cool-metal jewelry with soft reflection.",
         category: "Jewelry",
         paletteTags: ["Summer", "Soft Summer"],
-        image: "Matte silver chain",
+        image: "Matte silver necklace",
         reason: "Subdued shine is more flattering than high gloss.",
       },
       {
@@ -489,20 +498,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "soft-autumn-shirt",
-        title: "Muted olive shirt",
+        title: "Dull olive green shirt",
         description: "Relaxed tailoring and grounded warm color.",
         category: "Clothing",
         paletteTags: ["Autumn", "Soft Autumn"],
-        image: "Muted olive shirt",
+        image: "dull olive green shirt",
         reason: "Soft-warm earthy shades balance your features beautifully.",
       },
       {
         id: "soft-autumn-jewelry",
-        title: "Champagne hoops",
+        title: "Gold hoop earrings",
         description: "Soft gold jewelry instead of bright yellow gold.",
         category: "Jewelry",
         paletteTags: ["Autumn", "Soft Autumn"],
-        image: "Champagne hoops",
+        image: "Gold hoop earrings",
         reason: "A softened finish harmonizes with your muted warmth.",
       },
       {
@@ -548,20 +557,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "true-autumn-knit",
-        title: "Camel collared knit",
+        title: "Dull yellow collared knit shirt",
         description: "A warm structured knit close to the face.",
         category: "Clothing",
         paletteTags: ["Autumn", "True Autumn"],
-        image: "Camel collared knit",
+        image: "dull yellow collared knit shirt",
         reason: "Rich warm neutrals highlight your undertone beautifully.",
       },
       {
         id: "true-autumn-jewelry",
-        title: "Antique gold pendant",
+        title: "Gold pendant necklace",
         description: "Warm brushed jewelry with earthy stones.",
         category: "Jewelry",
         paletteTags: ["Autumn", "True Autumn"],
-        image: "Antique gold pendant",
+        image: "Gold pendant necklace",
         reason: "Depth and warmth are more flattering than icy contrast.",
       },
       {
@@ -607,20 +616,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "deep-autumn-top",
-        title: "Deep olive overshirt",
+        title: "Olive green button up shirt",
         description: "A grounded dark warm layer with structure.",
         category: "Clothing",
         paletteTags: ["Autumn", "Deep Autumn"],
-        image: "Deep olive overshirt",
+        image: "olive green button up shirt",
         reason: "You can carry richer warmth and deeper contrast beautifully.",
       },
       {
         id: "deep-autumn-jewelry",
-        title: "Oxidized bronze ring",
+        title: "Dull gold ring",
         description: "Warm dark metal with subtle texture.",
         category: "Jewelry",
         paletteTags: ["Autumn", "Deep Autumn"],
-        image: "Bronze ring",
+        image: "Dull gold ring",
         reason: "Deeper finishes mirror your stronger natural depth.",
       },
       {
@@ -666,20 +675,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "bright-winter-shirt",
-        title: "Crisp contrast polo",
+        title: "Bright Blue polo shirt",
         description: "Bright cool color with a clean neckline.",
         category: "Clothing",
         paletteTags: ["Winter", "Bright Winter"],
-        image: "Crisp polo",
+        image: "Bright Blue polo shirt",
         reason: "You carry clarity and cool contrast extremely well.",
       },
       {
         id: "bright-winter-jewelry",
-        title: "High-shine silver hoops",
+        title: "Shiny silver hoop earrings",
         description: "Reflective cool metal with strong clarity.",
         category: "Jewelry",
         paletteTags: ["Winter", "Bright Winter"],
-        image: "High-shine hoops",
+        image: "Shiny silver hoop earrings",
         reason: "Clean cool shine matches your higher contrast.",
       },
       {
@@ -725,20 +734,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "true-winter-top",
-        title: "Sharp cool knit",
+        title: "Cool knit shirt",
         description: "A saturated cool top with clean structure.",
         category: "Clothing",
         paletteTags: ["Winter", "True Winter"],
-        image: "Sharp cool knit",
+        image: "Cool knit shirt",
         reason: "Strong cool contrast supports your features best.",
       },
       {
         id: "true-winter-jewelry",
-        title: "Sleek silver pendant",
+        title: "Silver pendant necklace",
         description: "Polished silver with clear contrast.",
         category: "Jewelry",
         paletteTags: ["Winter", "True Winter"],
-        image: "Sleek silver pendant",
+        image: "Silver pendant necklace",
         reason: "Crisp cool metal keeps the palette feeling deliberate.",
       },
       {
@@ -784,20 +793,20 @@ const PALETTES: Record<
     clothing: [
       {
         id: "deep-winter-shirt",
-        title: "Midnight collared top",
+        title: "Navy collared shirt",
         description: "Deep cool tailoring adds structure and focus.",
         category: "Clothing",
         paletteTags: ["Winter", "Deep Winter"],
-        image: "Midnight collared top",
+        image: "Navy collared shirt",
         reason: "You support drama best when the tones stay cool.",
       },
       {
         id: "deep-winter-jewelry",
-        title: "Blackened silver ring",
+        title: "Black silver ring",
         description: "Sharper lines and deeper cool finish.",
         category: "Jewelry",
         paletteTags: ["Winter", "Deep Winter"],
-        image: "Blackened silver ring",
+        image: "Black silver ring",
         reason: "Depth and cool contrast mirror your natural coloring.",
       },
       {
@@ -1391,6 +1400,10 @@ export async function analyzePortrait(
     (options.wearingMakeup ? 0.04 : 0) +
     (options.hairDyed ? 0.03 : 0);
   const confidence = Math.max(0.42, Math.min(0.93, confidenceBase - penalty));
+ 
+  const secondaryPalette =
+  PALETTES[SEASON_DEFAULT_SUBTYPE[season.secondarySeason]] ??
+  PALETTES["True Summer"];
 
   const result: AnalysisResult = {
     analysisId: crypto.randomUUID(),
@@ -1415,6 +1428,7 @@ export async function analyzePortrait(
     eyes,
     hair: hairColor,
     bestColors: palette.best,
+    secondaryBestColors: secondaryPalette.best,
     neutralColors: palette.neutrals,
     accentColors: palette.accents,
     avoidColors: palette.avoid,
