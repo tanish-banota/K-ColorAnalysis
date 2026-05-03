@@ -7,6 +7,8 @@ import type { ChangeEvent, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   analyzePortrait,
+  buildClothingByColor,
+  buildJewelryItems,
   formatConfidence,
   groupRecommendations,
   type AnalysisResult,
@@ -69,9 +71,39 @@ export default function Home() {
   const recommendationGroups = result ? groupRecommendations(result) : null;
 
   useEffect(() => {
-    const state: SavedState = { result, favorites, history };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const stripSnapshot = (item: AnalysisResult): AnalysisResult => ({
+      ...item,
+      snapshotDataUrl: "",
+    });
+
+    const tryWrite = (state: SavedState) => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const slimHistory = history.map(stripSnapshot);
+
+    // Best: keep the current snapshot, strip history snapshots
+    if (tryWrite({ result, favorites, history: slimHistory })) return;
+
+    // Fallback: also drop the current snapshot
+    if (
+      tryWrite({
+        result: result ? stripSnapshot(result) : null,
+        favorites,
+        history: slimHistory,
+      })
+    )
+      return;
+
+    // Last resort: keep favorites only
+    tryWrite({ result: null, favorites, history: [] });
   }, [favorites, history, result]);
+
 
   useEffect(() => {
     if (!cameraEnabled || !videoRef.current || !streamRef.current) {
@@ -727,12 +759,9 @@ function RecommendationsScreen({
     );
   }
 
-  const clothingItems = result.clothingRecommendations.filter(
-    (item) => item.category === "Clothing",
-  );
-  const jewelryItems = result.clothingRecommendations.filter(
-    (item) => item.category === "Jewelry",
-  );
+  const clothingItems = buildClothingByColor(result);
+  const jewelryItems = buildJewelryItems(result);
+
 
   const filterSaved = <T extends { id: string }>(list: T[]) =>
     selectedFeed === "Favorites"
@@ -950,21 +979,23 @@ function ProductCard({
       <div className="space-y-1 px-4 py-3">
         <div className="text-sm font-semibold">{item.title}</div>
         <div className="text-xs leading-5 text-[var(--muted)]">{item.reason}</div>
-        {productImage?.attribution && (
-          <div className="pt-1 text-[9px] uppercase tracking-[0.18em] text-[var(--muted)]">
-            Photo by{" "}
-            <a
-              href={`${productImage.attribution.photographerUrl}?utm_source=k-color-analysis&utm_medium=referral`}
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
-              {productImage.attribution.photographer}
-            </a>{" "}
-            / Unsplash
+        {productImage?.price && (
+          <div className="pt-1 text-sm font-semibold text-black">
+            {productImage.price}
           </div>
         )}
+        {productImage?.itemUrl && (
+          <a
+            href={productImage.itemUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-block rounded-full bg-black px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-white"
+          >
+            View on eBay
+          </a>
+        )}
       </div>
+
     </div>
   );
 }

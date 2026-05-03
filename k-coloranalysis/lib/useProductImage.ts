@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 
 export type ProductImage = {
   url: string | null;
-  attribution?: { photographer: string; photographerUrl: string };
+  itemUrl?: string;
+  seller?: string;
+  price?: string;
 };
 
 const memoryCache = new Map<string, ProductImage>();

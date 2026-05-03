@@ -1445,40 +1445,83 @@ export function formatConfidence(confidence: number) {
 }
 
 export function groupRecommendations(result: AnalysisResult) {
-  const colors: RecommendationItem[] = [
-    {
-      id: `${result.analysisId}-best-colors`,
-      title: "Best color direction",
-      description: `${result.bestColors.map((color) => color.name).join(", ")}.`,
-      category: "Colors",
-      paletteTags: [result.primarySeason, result.toneSubtype],
-      image: "Personal palette",
-      reason: "These shades are strongest near your face.",
-    },
-  ];
-
   return {
-    clothing: result.clothingRecommendations.filter(
-      (item) => item.category === "Clothing",
-    ),
-    jewelry: result.clothingRecommendations
-      .filter((item) => item.category === "Jewelry")
-      .concat(
-        result.jewelryRecommendations.map((item, index) => ({
-          id: `${result.analysisId}-jewelry-${index}`,
-          title: `${item.finish} ${item.metal}`,
-          description: `${item.stoneFamily} details work especially well.`,
-          category: "Jewelry" as const,
-          paletteTags: [result.primarySeason, result.toneSubtype],
-          image: "Jewelry match",
-          reason: item.reason,
-        })),
-      ),
-    colors: result.clothingRecommendations
-      .filter((item) => item.category === "Colors")
-      .concat(colors),
+    clothing: buildClothingByColor(result),
+    jewelry: buildJewelryItems(result),
+    colors: result.bestColors.map((swatch) => ({
+      id: `color:${swatch.hex}`,
+      title: swatch.name,
+      description: swatch.hex,
+      category: "Colors" as const,
+      paletteTags: [result.primarySeason, result.toneSubtype],
+      image: swatch.name,
+      reason: "Strongest near your face.",
+    })),
   };
 }
+
+
+export function buildClothingByColor(result: AnalysisResult): RecommendationItem[] {
+  const colors = [
+    ...result.bestColors.map((c) => ({ ...c, source: "primary" as const })),
+    ...result.secondaryBestColors.map((c) => ({ ...c, source: "secondary" as const })),
+  ];
+
+  const garmentTypes = [
+    { type: "shirt", description: "A soft top close to the face." },
+    { type: "knit top", description: "A relaxed knit for layering." },
+    { type: "blouse", description: "A fluid blouse with movement." },
+  ];
+
+  return colors.flatMap((color) =>
+    garmentTypes.map((garment) => ({
+      id: `clothing-${color.hex.replace("#", "").toLowerCase()}-${garment.type.replace(/\s+/g, "-")}`,
+      title: `${color.name} ${garment.type}`,
+      description: `${garment.description} In ${color.name.toLowerCase()}.`,
+      category: "Clothing" as const,
+      paletteTags: [result.primarySeason, result.toneSubtype, color.name],
+      image: `${color.name.toLowerCase()} ${garment.type}`,
+      reason:
+        color.source === "primary"
+          ? `${color.name} is in your ${result.primarySeason} palette and lifts your features near the face.`
+          : `${color.name} is in your secondary ${result.secondarySeason} palette — great for variety.`,
+    })),
+  );
+}
+
+
+function getMetalForSeason(
+  season: AnalysisResult["primarySeason"],
+): "Gold" | "Silver" {
+  return season === "Spring" || season === "Autumn" ? "Gold" : "Silver";
+}
+
+export function buildJewelryItems(result: AnalysisResult): RecommendationItem[] {
+  const metal = getMetalForSeason(result.primarySeason);
+  const finishHint = result.jewelryRecommendations[0];
+
+  const jewelryTypes = [
+    { type: "hoop earrings",    description: "Versatile everyday hoops." },
+    { type: "pendant necklace", description: "A clean pendant for layering." },
+    { type: "stud earrings",    description: "Refined studs for daily wear." },
+    { type: "chain bracelet",   description: "Layered chain on the wrist." },
+    { type: "statement ring",   description: "A bolder ring as a focal piece." },
+    { type: "drop earrings",    description: "Longer drops for evening looks." },
+  ];
+
+  return jewelryTypes.map((jt) => ({
+    id: `jewelry-${metal.toLowerCase()}-${jt.type.replace(/\s+/g, "-")}`,
+    title: `${metal} ${jt.type}`,
+    description: `${jt.description} In ${metal.toLowerCase()}.`,
+    category: "Jewelry" as const,
+    paletteTags: [result.primarySeason, result.toneSubtype, metal],
+    image: `${metal.toLowerCase()} ${jt.type}`,
+    reason: finishHint
+      ? `${metal} suits your ${result.toneSubtype} palette. ${finishHint.reason}`
+      : `${metal} flatters your ${result.primarySeason.toLowerCase()} undertone.`,
+  }));
+}
+
 
 declare global {
   interface Window {
