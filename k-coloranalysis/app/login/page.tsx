@@ -56,11 +56,11 @@ export default function LoginPage() {
 
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="text-sm text-[var(--muted)] uppercase tracking-[0.24em]">
+          <div className="text-3xl font-semibold tracking-[-0.04em]">
             K-Color Analysis
           </div>
-          <h1 className="mt-3 text-[2rem] font-semibold tracking-[-0.04em]">
-            Welcome!
+          <h1 className="mt-3 text-base text-[var(--muted)]">
+            Welcome — sign in to continue.
           </h1>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Sign in to save your color results and recommendations

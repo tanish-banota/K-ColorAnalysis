@@ -64,8 +64,11 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--app-canvas)]">
       <div className="w-full max-w-[430px] bg-white p-6 rounded-[32px] shadow-[0_24px_80px_rgba(18,18,18,0.08)]">
 
-        <h1 className="text-2xl font-semibold text-center mb-4">
-          Create Account
+        <div className="text-3xl font-semibold text-center tracking-[-0.04em]">
+          K-Color Analysis
+        </div>
+        <h1 className="text-base text-[var(--muted)] text-center mt-1 mb-5">
+          Create your account
         </h1>
 
         <button

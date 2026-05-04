@@ -336,6 +336,11 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[var(--app-canvas)] text-[var(--ink)]">
       <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white shadow-[0_0_0_1px_rgba(18,18,18,0.04),0_24px_80px_rgba(18,18,18,0.08)]">
+        <header className="sticky top-0 z-20 border-b border-black/6 bg-white/95 px-5 py-4 backdrop-blur">
+          <div className="text-2xl font-semibold tracking-[-0.03em]">
+            K-Color Analysis
+          </div>
+        </header>
         <div className="flex-1 overflow-y-auto px-5 pb-28 pt-5">
           {activeTab === "home" && (
             <HomeScreen
@@ -422,7 +427,6 @@ function HomeScreen({
   return (
     <div className="space-y-6">
       <div className="space-y-3 pt-2">
-        <div className="text-sm font-medium text-[var(--muted)]">K-Color Analysis</div>
         <div className="rounded-[30px] bg-[var(--soft)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
