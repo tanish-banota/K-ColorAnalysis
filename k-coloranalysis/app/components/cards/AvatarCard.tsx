@@ -27,7 +27,7 @@ export function AvatarCard({ result }: AvatarCardProps) {
             className="mt-4 h-32 rounded-t-[56px] border border-white/70"
             style={{
               background: `linear-gradient(180deg, ${
-                result.bestColors[0]?.hex ?? "#D8C5B7"
+                result.bestColors?.[0]?.hex ?? "#D8C5B7"
               } 0%, ${result.neutralColors[0]?.hex ?? "#EEE2DA"} 100%)`,
             }}
           />
@@ -43,7 +43,7 @@ export function AvatarCard({ result }: AvatarCardProps) {
             {result.explanations[0]}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {result.bestColors.slice(0, 4).map((swatch) => (
+            {(result.bestColors ?? []).slice(0, 4).map((swatch) => (
               <SwatchChip key={swatch.hex} swatch={swatch} />
             ))}
           </div>

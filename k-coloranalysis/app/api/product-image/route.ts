@@ -29,11 +29,6 @@ type ImagePayload = {
 const imageCache = new Map<string, ImagePayload>();
 let tokenCache: { token: string; expiresAt: number } | null = null;
 
-const EBAY_CATEGORY_IDS: Record<string, string> = {
-  clothing: "11450", // Clothing, Shoes & Accessories
-  jewelry: "281", // Jewelry & Watches
-};
-
 async function getAccessToken(): Promise<string | null> {
   if (tokenCache && tokenCache.expiresAt > Date.now()) {
     return tokenCache.token;
@@ -51,10 +46,13 @@ async function getAccessToken(): Promise<string | null> {
       Authorization: `Basic ${creds}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: "grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope",
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      scope: "https://api.ebay.com/oauth/api_scope",
+    }),
   });
 
-  if (!response.ok) return null;
+  if (!response.ok) throw new Error("eBay token request failed");
 
   const data = (await response.json()) as EbayTokenResponse;
   tokenCache = {
@@ -77,7 +75,12 @@ export async function GET(request: Request) {
   const cached = imageCache.get(cacheKey);
   if (cached) return Response.json(cached);
 
-  const token = await getAccessToken();
+  let token: string | null;
+  try {
+    token = await getAccessToken();
+  } catch {
+    return Response.json({ url: null, reason: "token_error" } satisfies ImagePayload);
+  }
   if (!token) {
     return Response.json({
       url: null,
@@ -86,19 +89,22 @@ export async function GET(request: Request) {
   }
 
   const params = new URLSearchParams({ q: query, limit: "8" });
-  const categoryId = category ? EBAY_CATEGORY_IDS[category] : undefined;
-  if (categoryId) params.set("category_ids", categoryId);
   params.set("filter", "buyingOptions:{FIXED_PRICE}");
 
-  const response = await fetch(
-    `https://api.ebay.com/buy/browse/v1/item_summary/search?${params.toString()}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://api.ebay.com/buy/browse/v1/item_summary/search?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+        },
       },
-    },
-  );
+    );
+  } catch {
+    return Response.json({ url: null, reason: "ebay_error" } satisfies ImagePayload);
+  }
 
   if (!response.ok) {
     return Response.json({

@@ -35,6 +35,7 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>(initialState.favorites);
   const [history, setHistory] = useState<AnalysisResult[]>(initialState.history);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [lastScanFailed, setLastScanFailed] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [hairDyed, setHairDyed] = useState(initialState.preferences.hairDyed);
   const [wearingMakeup, setWearingMakeup] = useState(
@@ -353,20 +354,34 @@ export default function Home() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
+    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+        !video.videoWidth || !video.videoHeight) {
+      setCameraError("The camera is still starting. Wait for your face to appear, then try again.");
+      return;
+    }
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const context = canvas.getContext("2d");
-    if (!context) return;
+    if (!context) {
+      setCameraError("The camera could not capture this frame. Please try again or upload a photo.");
+      return;
+    }
 
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const previewUrl = canvas.toDataURL("image/jpeg", 0.92);
-    setCapturedPreview(previewUrl);
-
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob((value) => resolve(value), "image/jpeg", 0.92),
     );
 
-    if (!blob) return;
+    if (!blob || !blob.size) {
+      setCameraError("The camera could not save this frame. Please try again or upload a photo.");
+      return;
+    }
+
+    const previewUrl = canvas.toDataURL("image/jpeg", 0.92);
+    setCapturedPreview(previewUrl);
+    setCameraError(null);
+    stopCamera();
 
     const file = new File([blob], "camera-capture.jpg", {
       type: "image/jpeg",
@@ -378,6 +393,7 @@ export default function Home() {
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    event.target.value = "";
 
     const preview = URL.createObjectURL(file);
     setCapturedPreview(preview);
@@ -395,7 +411,19 @@ export default function Home() {
       setAnalysisStep(index);
     }
 
-    const analysis = await analyzePortrait(file, { hairDyed, wearingMakeup });
+    let analysis;
+    try {
+      analysis = await analyzePortrait(file, { hairDyed, wearingMakeup });
+    } catch {
+      setLastScanFailed(true);
+      setIssues([{
+        code: "invalid_image",
+        message: "This photo could not be read. Please take another photo or choose a different image.",
+        severity: "error",
+      }]);
+      setIsAnalyzing(false);
+      return;
+    }
     await wait(300);
     setAnalysisStep(ANALYSIS_STEPS.length - 1);
     await wait(250);
@@ -403,7 +431,12 @@ export default function Home() {
     setIssues(analysis.issues);
     setIsAnalyzing(false);
 
-    if (!analysis.result) return;
+    if (!analysis.result) {
+      setLastScanFailed(true);
+      return;
+    }
+
+    setLastScanFailed(false);
 
     const nextResult = {
       ...analysis.result,
@@ -451,6 +484,7 @@ export default function Home() {
           {activeTab === "home" && (
             <HomeScreen
               result={result}
+              lastScanFailed={lastScanFailed}
               favorites={favorites}
               onOpenRecommendations={() => setActiveTab("recommendations")}
               onOpenAnalyze={openAnalyze}
@@ -499,6 +533,7 @@ export default function Home() {
           {activeTab === "recommendations" && (
             <RecommendationsScreen
               result={result}
+              lastScanFailed={lastScanFailed}
               selectedFeed={selectedFeed}
               onFeedChange={setSelectedFeed}
               favorites={favorites}

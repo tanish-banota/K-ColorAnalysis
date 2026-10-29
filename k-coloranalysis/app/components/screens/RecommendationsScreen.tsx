@@ -12,6 +12,7 @@ import { EmptyState } from "@/app/components/ui/EmptyState";
 
 type RecommendationsScreenProps = {
   result: AnalysisResult | null;
+  lastScanFailed: boolean;
   selectedFeed: "For you" | "Favorites";
   onFeedChange: (value: "For you" | "Favorites") => void;
   favorites: string[];
@@ -20,12 +21,13 @@ type RecommendationsScreenProps = {
 
 export function RecommendationsScreen({
   result,
+  lastScanFailed,
   selectedFeed,
   onFeedChange,
   favorites,
   onToggleFavorite,
 }: RecommendationsScreenProps) {
-  if (!result) {
+  if (!result || !Array.isArray(result.bestColors) || !result.primarySeason) {
     return (
       <EmptyState
         title="Run your first analysis"
@@ -43,10 +45,10 @@ export function RecommendationsScreen({
       : list;
 
   const primaryColors = filterSaved(
-    result.bestColors.map((swatch) => ({ ...swatch, id: `color:${swatch.hex}` })),
+    (result.bestColors ?? []).map((swatch) => ({ ...swatch, id: `color:${swatch.hex}` })),
   );
   const secondaryColors = filterSaved(
-    result.secondaryBestColors.map((swatch) => ({
+    (result.secondaryBestColors ?? []).map((swatch) => ({
       ...swatch,
       id: `color:${swatch.hex}`,
     })),
@@ -59,6 +61,11 @@ export function RecommendationsScreen({
 
   return (
     <div className="space-y-6">
+      {lastScanFailed && (
+        <div className="rounded-[20px] bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Your latest scan did not complete. These looks use an earlier photo.
+        </div>
+      )}
       <div className="text-center">
         <div className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
           Recommendations

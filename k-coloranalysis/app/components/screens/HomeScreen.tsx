@@ -11,6 +11,7 @@ import { SectionHeader } from "@/app/components/ui/SectionHeader";
 
 type HomeScreenProps = {
   result: AnalysisResult | null;
+  lastScanFailed: boolean;
   favorites: string[];
   onOpenAnalyze: () => void;
   onOpenRecommendations: () => void;
@@ -18,6 +19,7 @@ type HomeScreenProps = {
 
 export function HomeScreen({
   result,
+  lastScanFailed,
   favorites,
   onOpenAnalyze,
   onOpenRecommendations,
@@ -27,6 +29,11 @@ export function HomeScreen({
 
   return (
     <div className="space-y-6">
+      {lastScanFailed && result && (
+        <div className="rounded-[20px] bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Your latest scan did not complete. The match below is from an earlier photo.
+        </div>
+      )}
       <div className="space-y-3 pt-2">
         <div className="rounded-[30px] bg-[var(--soft)] p-5">
           <div className="flex items-start justify-between gap-4">
@@ -122,8 +129,8 @@ export function HomeScreen({
               />
               <RecommendationOrb
                 label="Colors"
-                subtitle={result.bestColors[0]?.name ?? "Palette"}
-                swatchHex={result.bestColors[0]?.hex}
+                subtitle={result.bestColors?.[0]?.name ?? "Palette"}
+                swatchHex={result.bestColors?.[0]?.hex}
               />
             </div>
           </section>
