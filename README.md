@@ -1,4 +1,4 @@
-# K-ColorAnalysis
+# Korean Color Analysis Collaborative Project
 Introduction:
 
 An app that looks at the facial features, skin tone, eye color and hair of a person, it determines your personal color palette and secondary palettes
