@@ -101,6 +101,22 @@ export function ProfileScreen({
         <div className="mt-3 text-sm leading-6 text-[var(--muted)]">
           {result.qualitySummary}
         </div>
+        <div className="mt-4 flex gap-5 text-xs text-[var(--muted)]">
+          {([
+            ["Skin", result.skin?.hex],
+            ["Eyes", result.eyes?.hex],
+            ["Hair", result.hair?.hex],
+          ] as const).map(([label, hex]) => hex && (
+            <div key={label} className="flex flex-col items-center gap-1">
+              <span
+                className="h-8 w-8 rounded-full border border-black/10"
+                style={{ backgroundColor: hex }}
+              />
+              <span>{label}</span>
+              <span>{hex}</span>
+            </div>
+          ))}
+        </div>
         <button
           type="button"
           onClick={onRetake}

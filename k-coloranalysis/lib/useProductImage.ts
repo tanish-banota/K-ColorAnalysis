@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 export type ProductImage = {
   url: string | null;
+  reason?: "missing_credentials" | "no_results" | "ebay_error" | "token_error";
   itemUrl?: string;
   seller?: string;
   price?: string;
@@ -35,8 +36,11 @@ export function useProductImage(
         const params = new URLSearchParams({ query });
         if (category) params.set("category", category);
         const response = await fetch(`/api/product-image?${params.toString()}`);
+        if (!response.ok) throw new Error("Product image request failed");
         const payload = (await response.json()) as ProductImage;
-        memoryCache.set(key, payload);
+        if (!payload.reason || payload.reason === "no_results") {
+          memoryCache.set(key, payload);
+        }
         if (!cancelled) setData(payload);
       } catch {
         if (!cancelled) setData({ url: null });

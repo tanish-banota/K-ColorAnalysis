@@ -8,7 +8,8 @@ export type CaptureIssueCode =
   | "face_out_of_frame"
   | "poor_lighting"
   | "image_blurry"
-  | "face_detection_unavailable";
+  | "face_detection_unavailable"
+  | "invalid_image";
 
 export type CaptureIssue = {
   code: CaptureIssueCode;
@@ -910,7 +911,7 @@ function luminance([r, g, b]: [number, number, number]) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-function buildRegionColor(rgb: [number, number, number]): RegionColor {
+export function buildRegionColor(rgb: [number, number, number]): RegionColor {
   return {
     rgb,
     hex: rgbToHex(rgb),
@@ -1028,45 +1029,49 @@ function computeBlurScore(
   return edgeEnergy / Math.max(samples, 1);
 }
 
-async function detectFaces(target: CanvasImageSource) {
-  if (typeof window === "undefined" || !("FaceDetector" in window)) {
-    return { faces: [] as FaceCandidate[], supported: false };
-  }
+type MediaPipeFaceDetector = import("@mediapipe/tasks-vision").FaceDetector;
+let faceDetectorPromise: Promise<MediaPipeFaceDetector> | null = null;
 
-  try {
-    const Detector = window.FaceDetector;
-    if (!Detector) {
-      return { faces: [] as FaceCandidate[], supported: false };
-    }
-
-    const detector = new Detector({
-      fastMode: true,
-      maxDetectedFaces: 2,
+async function getFaceDetector(): Promise<MediaPipeFaceDetector> {
+  if (!faceDetectorPromise) {
+    faceDetectorPromise = (async () => {
+      const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
+      const vision = await FilesetResolver.forVisionTasks("/mediapipe");
+      return FaceDetector.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "/mediapipe/blaze_face_short_range.tflite",
+          delegate: "CPU",
+        },
+        runningMode: "IMAGE",
+        minDetectionConfidence: 0.5,
+      });
+    })().catch((error) => {
+      faceDetectorPromise = null;
+      throw error;
     });
-    const detections = await detector.detect(target);
+  }
+  return faceDetectorPromise;
+}
+
+async function detectFaces(target: HTMLCanvasElement) {
+  try {
+    const detector = await getFaceDetector();
+    const detections = detector.detect(target).detections;
     return {
       supported: true,
-      faces: detections.map((detection) => ({
-        x: detection.boundingBox.x,
-        y: detection.boundingBox.y,
-        width: detection.boundingBox.width,
-        height: detection.boundingBox.height,
-      })),
+      faces: detections.flatMap((detection) => {
+        const box = detection.boundingBox;
+        return box ? [{
+          x: box.originX,
+          y: box.originY,
+          width: box.width,
+          height: box.height,
+        }] : [];
+      }),
     };
   } catch {
     return { faces: [] as FaceCandidate[], supported: false };
   }
-}
-
-function fallbackFace(width: number, height: number): FaceCandidate {
-  const faceWidth = width * 0.42;
-  const faceHeight = height * 0.52;
-  return {
-    x: (width - faceWidth) / 2,
-    y: height * 0.18,
-    width: faceWidth,
-    height: faceHeight,
-  };
 }
 
 function evaluateFaceIssues(
@@ -1101,7 +1106,7 @@ function evaluateFaceIssues(
   return issues;
 }
 
-function chooseSeason({
+export function chooseSeason({
   warmScore,
   valueScore,
   chromaScore,
@@ -1121,7 +1126,7 @@ function chooseSeason({
           ? "Cool"
           : "Neutral-Cool";
   const value =
-    valueScore > 61 ? "Light" : valueScore < 44 ? "Deep" : "Medium";
+    valueScore > 68 ? "Light" : valueScore < 42 ? "Deep" : "Medium";
   const chroma =
     chromaScore > 54 ? "Clear" : chromaScore < 35 ? "Soft" : "Balanced";
   const contrast =
@@ -1131,13 +1136,15 @@ function chooseSeason({
   let toneSubtype: string;
 
   if (warmScore >= 0) {
-    if (value === "Light" && contrast !== "High") {
+    if (value === "Light") {
       primarySeason = "Spring";
-      toneSubtype = chroma === "Clear" ? "True Spring" : "Light Spring";
-    } else if (contrast === "High" && chroma === "Clear") {
+      toneSubtype = contrast === "High" && chroma !== "Soft"
+        ? "Bright Spring"
+        : chroma === "Clear" ? "True Spring" : "Light Spring";
+    } else if (contrast === "High" && chroma === "Clear" && value !== "Deep") {
       primarySeason = "Spring";
       toneSubtype = "Bright Spring";
-    } else if (value === "Deep" || contrast === "High") {
+    } else if (value === "Deep") {
       primarySeason = "Autumn";
       toneSubtype = "Deep Autumn";
     } else if (chroma === "Soft") {
@@ -1154,9 +1161,12 @@ function chooseSeason({
     } else if (contrast === "High" && chroma === "Clear") {
       primarySeason = "Winter";
       toneSubtype = "Bright Winter";
-    } else if (value === "Deep" || contrast === "High") {
+    } else if (value === "Deep") {
       primarySeason = "Winter";
       toneSubtype = "Deep Winter";
+    } else if (contrast === "High") {
+      primarySeason = "Winter";
+      toneSubtype = "True Winter";
     } else if (chroma === "Soft") {
       primarySeason = "Summer";
       toneSubtype = "Soft Summer";
@@ -1178,6 +1188,31 @@ function chooseSeason({
     toneSubtype,
     secondarySeason: SUBTYPE_TO_SECONDARY[toneSubtype],
   };
+}
+
+export function scorePortraitColors(
+  skin: RegionColor,
+  eyes: RegionColor,
+  hair: RegionColor,
+  options: AnalysisOptions,
+) {
+  const chromaScore =
+    skin.hsl.s * 0.5 + eyes.hsl.s * 0.25 + hair.hsl.s * 0.25;
+  // Complexion value is skin lightness. Dark eyes or hair affect contrast,
+  // but must not make a light complexion look "Deep" by themselves.
+  const valueScore = skin.lab.l;
+  const contrastScore =
+    Math.abs(luminance(skin.rgb) - luminance(hair.rgb)) * 0.7 +
+    Math.abs(luminance(skin.rgb) - luminance(eyes.rgb)) * 0.3;
+
+  // Skin is naturally yellow in Lab for many complexions. Compare its yellow
+  // component with its red component instead of treating b > 0 as warm.
+  const skinWarmth = skin.lab.b - skin.lab.a * 0.85;
+  const hairWarmth = Math.max(-3, Math.min(3, (hair.lab.b - hair.lab.a) * 0.12));
+  const warmScore = (skinWarmth + (options.hairDyed ? 0 : hairWarmth)) *
+    (options.wearingMakeup ? 0.7 : 1);
+
+  return { warmScore, valueScore, chromaScore, contrastScore };
 }
 
 function buildExplanations(
@@ -1252,6 +1287,17 @@ export async function analyzePortrait(
   const brightness = computeBrightness(context, canvas.width, canvas.height);
   const blurScore = computeBlurScore(context, canvas.width, canvas.height);
 
+  if (canvas.width === 0 || canvas.height === 0 || brightness.average < 15 ||
+      brightness.average > 245 || blurScore < 2.5) {
+    return {
+      issues: [{
+        code: "invalid_image",
+        message: "This photo has no usable face detail. Retake it with your face visible in even light.",
+        severity: "error",
+      }],
+    };
+  }
+
   const issues: CaptureIssue[] = [];
   if (brightness.average < 80 || brightness.average > 205) {
     issues.push({
@@ -1298,19 +1344,18 @@ export async function analyzePortrait(
     issues.push({
       code: "face_detection_unavailable",
       message:
-        "Your browser does not support advanced face detection, so this uses a centered portrait estimate.",
-      severity: "info",
+        "Face detection could not load. Check your connection and try again; no palette was assigned.",
+      severity: "error",
     });
   }
-
-  const face =
-    faceDetection.faces[0] ?? fallbackFace(canvas.width, canvas.height);
-  issues.push(...evaluateFaceIssues(face, canvas.width, canvas.height));
 
   const blockingIssues = issues.filter((issue) => issue.severity === "error");
   if (blockingIssues.length) {
     return { issues };
   }
+
+  const face = faceDetection.faces[0];
+  issues.push(...evaluateFaceIssues(face, canvas.width, canvas.height));
 
   const forehead = regionAverage(
     context,
@@ -1370,17 +1415,8 @@ export async function analyzePortrait(
   const eyes = buildRegionColor(eyesRgb);
   const hairColor = buildRegionColor(hair);
 
-  const chromaScore =
-    skin.hsl.s * 0.5 + eyes.hsl.s * 0.25 + hairColor.hsl.s * 0.25;
-  const valueScore =
-    skin.lab.l * 0.55 + eyes.lab.l * 0.15 + hairColor.lab.l * 0.3;
-  const contrastScore =
-    Math.abs(luminance(skin.rgb) - luminance(hairColor.rgb)) * 0.7 +
-    Math.abs(luminance(skin.rgb) - luminance(eyes.rgb)) * 0.3;
-
-  let warmScore = skin.lab.b - skin.lab.a * 0.15 + hairColor.lab.b * 0.2;
-  if (options.hairDyed) warmScore -= hairColor.lab.b * 0.12;
-  if (options.wearingMakeup) warmScore *= 0.92;
+  const { warmScore, valueScore, chromaScore, contrastScore } =
+    scorePortraitColors(skin, eyes, hairColor, options);
 
   const season = chooseSeason({
     warmScore,
@@ -1445,10 +1481,12 @@ export function formatConfidence(confidence: number) {
 }
 
 export function groupRecommendations(result: AnalysisResult) {
+  const primaryColors = result.bestColors ?? [];
+
   return {
     clothing: buildClothingByColor(result),
     jewelry: buildJewelryItems(result),
-    colors: result.bestColors.map((swatch) => ({
+    colors: primaryColors.map((swatch) => ({
       id: `color:${swatch.hex}`,
       title: swatch.name,
       description: swatch.hex,
@@ -1459,12 +1497,12 @@ export function groupRecommendations(result: AnalysisResult) {
     })),
   };
 }
-
-
 export function buildClothingByColor(result: AnalysisResult): RecommendationItem[] {
+  const primaryColors = result.bestColors ?? [];
+  const secondaryColors = result.secondaryBestColors ?? [];
   const colors = [
-    ...result.bestColors.map((c) => ({ ...c, source: "primary" as const })),
-    ...result.secondaryBestColors.map((c) => ({ ...c, source: "secondary" as const })),
+    ...primaryColors.map((c) => ({ ...c, source: "primary" as const })),
+    ...secondaryColors.map((c) => ({ ...c, source: "secondary" as const })),
   ];
 
   const garmentTypes = [
@@ -1498,7 +1536,7 @@ function getMetalForSeason(
 
 export function buildJewelryItems(result: AnalysisResult): RecommendationItem[] {
   const metal = getMetalForSeason(result.primarySeason);
-  const finishHint = result.jewelryRecommendations[0];
+  const finishHint = result.jewelryRecommendations?.[0];
 
   const jewelryTypes = [
     { type: "hoop earrings",    description: "Versatile everyday hoops." },
@@ -1520,18 +1558,4 @@ export function buildJewelryItems(result: AnalysisResult): RecommendationItem[] 
       ? `${metal} suits your ${result.toneSubtype} palette. ${finishHint.reason}`
       : `${metal} flatters your ${result.primarySeason.toLowerCase()} undertone.`,
   }));
-}
-
-
-declare global {
-  interface Window {
-    FaceDetector?: new (options?: {
-      fastMode?: boolean;
-      maxDetectedFaces?: number;
-    }) => {
-      detect(
-        source: CanvasImageSource,
-      ): Promise<Array<{ boundingBox: DOMRectReadOnly }>>;
-    };
-  }
 }
